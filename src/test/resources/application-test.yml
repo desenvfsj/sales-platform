@@ -1,0 +1,32 @@
+spring:
+  # Configuração de teste com H2 in-memory (para testes sem PostgreSQL)
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  
+  # JPA para testes
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+  
+  # Flyway desabilitado para testes (usando ddl-auto)
+  flyway:
+    enabled: false
+  
+  # Desabilitar configurações que podem causar problemas em testes
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+
+# Logging para testes
+logging:
+  level:
+    root: WARN
+    br.com.fsj.salesplatform: INFO
+

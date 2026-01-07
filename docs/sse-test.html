@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE Test - Sales Platform</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 18px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(231, 76, 60, 0.3);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .events {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .event {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid;
+            background: white;
+        }
+
+        .event.connected {
+            border-left-color: #28a745;
+        }
+
+        .event.cart-updated {
+            border-left-color: #007bff;
+        }
+
+        .event.cart-completed {
+            border-left-color: #ffc107;
+        }
+
+        .event.error {
+            border-left-color: #dc3545;
+        }
+
+        .event-type {
+            font-weight: bold;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .event-time {
+            color: #6c757d;
+            font-size: 11px;
+            margin-bottom: 5px;
+        }
+
+        .event-data {
+            color: #333;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .cart-info {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+        }
+
+        .cart-info h3 {
+            color: #0066cc;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .cart-detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 5px 0;
+            border-bottom: 1px solid #cce5ff;
+        }
+
+        .cart-detail:last-child {
+            border-bottom: none;
+        }
+
+        .cart-detail-label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .cart-detail-value {
+            color: #333;
+        }
+
+        .clear-btn {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 SSE Test - Sales Platform</h1>
+            <p class="subtitle">Teste de conexão Server-Sent Events para carrinhos em tempo real</p>
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>📡 Conexão SSE</h2>
+                
+                <div id="connectionStatus" class="status disconnected">
+                    🔴 Desconectado
+                </div>
+
+                <div class="input-group">
+                    <label for="cartId">ID do Carrinho:</label>
+                    <input type="number" id="cartId" placeholder="Ex: 1" value="1">
+                </div>
+
+                <div class="input-group">
+                    <label for="apiUrl">URL da API:</label>
+                    <input type="text" id="apiUrl" placeholder="http://localhost:8080" value="http://localhost:8080">
+                </div>
+
+                <button id="connectBtn" class="btn btn-primary">Conectar</button>
+                <button id="disconnectBtn" class="btn btn-danger" style="margin-top: 10px;" disabled>Desconectar</button>
+
+                <div id="cartInfo" class="cart-info" style="display: none;">
+                    <h3>📦 Informações do Carrinho</h3>
+                    <div class="cart-detail">
+                        <span class="cart-detail-label">ID:</span>
+                        <span class="cart-detail-value" id="cartInfoId">-</span>
+                    </div>
+                    <div class="cart-detail">
+                        <span class="cart-detail-label">Status:</span>
+                        <span class="cart-detail-value" id="cartInfoStatus">-</span>
+                    </div>
+                    <div class="cart-detail">
+                        <span class="cart-detail-label">Total:</span>
+                        <span class="cart-detail-value" id="cartInfoTotal">-</span>
+                    </div>
+                    <div class="cart-detail">
+                        <span class="cart-detail-label">Itens:</span>
+                        <span class="cart-detail-value" id="cartInfoItems">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>📋 Eventos Recebidos</h2>
+                <button id="clearEventsBtn" class="btn btn-primary clear-btn">Limpar Eventos</button>
+                <div id="events" class="events" style="margin-top: 10px;">
+                    <p style="color: #6c757d; text-align: center;">Aguardando conexão...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let eventSource = null;
+        let eventCount = 0;
+
+        const cartIdInput = document.getElementById('cartId');
+        const apiUrlInput = document.getElementById('apiUrl');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const eventsDiv = document.getElementById('events');
+        const clearEventsBtn = document.getElementById('clearEventsBtn');
+        const cartInfo = document.getElementById('cartInfo');
+
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        clearEventsBtn.addEventListener('click', clearEvents);
+
+        function connect() {
+            const cartId = cartIdInput.value;
+            const apiUrl = apiUrlInput.value;
+
+            if (!cartId) {
+                alert('Por favor, informe o ID do carrinho');
+                return;
+            }
+
+            if (eventSource) {
+                disconnect();
+            }
+
+            const url = `${apiUrl}/api/v1/carts/${cartId}/events`;
+            
+            addEvent('info', 'Conectando...', `URL: ${url}`);
+
+            try {
+                eventSource = new EventSource(url);
+
+                eventSource.addEventListener('connected', (event) => {
+                    addEvent('connected', 'Conectado', event.data);
+                    updateConnectionStatus(true);
+                });
+
+                eventSource.addEventListener('cart-updated', (event) => {
+                    const cart = JSON.parse(event.data);
+                    addEvent('cart-updated', 'Carrinho Atualizado', JSON.stringify(cart, null, 2));
+                    updateCartInfo(cart);
+                });
+
+                eventSource.addEventListener('cart-completed', (event) => {
+                    const cart = JSON.parse(event.data);
+                    addEvent('cart-completed', 'Carrinho Finalizado', JSON.stringify(cart, null, 2));
+                    updateCartInfo(cart);
+                    setTimeout(() => {
+                        alert('Carrinho finalizado! A conexão será encerrada.');
+                        disconnect();
+                    }, 1000);
+                });
+
+                eventSource.onerror = (error) => {
+                    console.error('Erro SSE:', error);
+                    addEvent('error', 'Erro na Conexão', 'Verifique se o servidor está rodando e se o carrinho existe.');
+                    updateConnectionStatus(false);
+                    disconnect();
+                };
+
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                cartIdInput.disabled = true;
+                apiUrlInput.disabled = true;
+
+            } catch (error) {
+                addEvent('error', 'Erro', error.message);
+                updateConnectionStatus(false);
+            }
+        }
+
+        function disconnect() {
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+                addEvent('info', 'Desconectado', 'Conexão encerrada pelo cliente');
+                updateConnectionStatus(false);
+            }
+
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            cartIdInput.disabled = false;
+            apiUrlInput.disabled = false;
+        }
+
+        function updateConnectionStatus(connected) {
+            if (connected) {
+                connectionStatus.className = 'status connected';
+                connectionStatus.textContent = '🟢 Conectado';
+            } else {
+                connectionStatus.className = 'status disconnected';
+                connectionStatus.textContent = '🔴 Desconectado';
+            }
+        }
+
+        function addEvent(type, title, data) {
+            eventCount++;
+            const now = new Date().toLocaleTimeString('pt-BR');
+            
+            const eventDiv = document.createElement('div');
+            eventDiv.className = `event ${type}`;
+            eventDiv.innerHTML = `
+                <div class="event-type">${title}</div>
+                <div class="event-time">${now} - Evento #${eventCount}</div>
+                <div class="event-data">${data}</div>
+            `;
+
+            if (eventsDiv.querySelector('p')) {
+                eventsDiv.innerHTML = '';
+            }
+
+            eventsDiv.insertBefore(eventDiv, eventsDiv.firstChild);
+        }
+
+        function updateCartInfo(cart) {
+            cartInfo.style.display = 'block';
+            document.getElementById('cartInfoId').textContent = cart.id;
+            document.getElementById('cartInfoStatus').textContent = cart.status;
+            document.getElementById('cartInfoTotal').textContent = `R$ ${cart.totalAmount.toFixed(2)}`;
+            document.getElementById('cartInfoItems').textContent = cart.totalItems;
+        }
+
+        function clearEvents() {
+            eventsDiv.innerHTML = '<p style="color: #6c757d; text-align: center;">Eventos limpos</p>';
+            eventCount = 0;
+        }
+    </script>
+</body>
+</html>
+

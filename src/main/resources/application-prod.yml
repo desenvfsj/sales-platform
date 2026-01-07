@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: sales-platform
+  
+  # Database Configuration
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+  
+  # JPA Configuration
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+# Server Configuration
+server:
+  port: ${SERVER_PORT:8080}
+
+# Logging Configuration
+logging:
+  level:
+    root: INFO
+    br.com.fsj.salesplatform: INFO
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    org.flywaydb: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: /app/logs/sales-platform.log
+    max-size: 10MB
+    max-history: 30
+    total-size-cap: 1GB

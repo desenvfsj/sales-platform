@@ -1,0 +1,108 @@
+# ============================================================================
+# .dockerignore - Arquivos e diretórios ignorados no build do Docker
+# ============================================================================
+
+# Build artifacts
+build/
+target/
+bin/
+out/
+*.class
+
+# Gradle
+.gradle/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# IDEs
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+*.iml
+*.ipr
+*.iws
+.cursor/
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+docs/
+*.txt
+*.html
+*.pdf
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Scripts
+*.sh
+*.bat
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Test files
+src/test/
+*Test.java
+*Tests.java
+
+# SQL scripts (migrations são incluídas via src/)
+*.sql
+!src/main/resources/db/migration/*.sql
+
+# Environment files
+.env
+.env.*
+*.local
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+
+# Coverage reports
+coverage/
+.nyc_output/
+*.lcov
+
+# Node modules (se houver frontend)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python (se houver scripts)
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+
+# Backup files
+*.bak
+*.backup
+*~
+

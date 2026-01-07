@@ -1,0 +1,1058 @@
+---
+alwaysApply: true
+---
+# Arquitetura do Projeto - Sales Platform
+
+## 📋 Índice
+
+1. [Visão Geral](#visão-geral)
+2. [Princípios Fundamentais](#princípios-fundamentais)
+3. [Estrutura de Camadas](#estrutura-de-camadas)
+4. [Regras de Dependências](#regras-de-dependências)
+5. [Padrões de Nomenclatura](#padrões-de-nomenclatura)
+6. [Fluxo de Dados](#fluxo-de-dados)
+7. [Regras por Camada](#regras-por-camada)
+8. [Exemplo Completo de Implementação](#exemplo-completo-de-implementação)
+9. [Checklist de Implementação](#checklist-de-implementação)
+10. [Validações Arquiteturais](#validações-arquiteturais)
+11. [Tratamento de Exceções](#tratamento-de-exceções)
+12. [Erros Comuns e Como Evitar](#erros-comuns-e-como-evitar)
+13. [Resumo das Regras Críticas](#resumo-das-regras-críticas)
+14. [Orientações para IA](#orientações-para-ia)
+
+---
+
+## 🏗️ Visão Geral
+
+Este projeto utiliza **Arquitetura Hexagonal (Ports and Adapters)** também conhecida como **Clean Architecture**. A arquitetura separa a lógica de negócio (core) das implementações técnicas (adapters), garantindo:
+
+- ✅ **Independência**: O core não depende de frameworks ou tecnologias específicas
+- ✅ **Testabilidade**: Fácil criação de testes unitários e de integração
+- ✅ **Manutenibilidade**: Mudanças em adapters não afetam o core
+- ✅ **Flexibilidade**: Fácil troca de implementações (ex: banco de dados, APIs externas)
+
+### Diagrama da Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ADAPTERS IN (Entrada)                    │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │  Controller  │  │   Consumer   │  │   Gateway    │     │
+│  │   (REST)     │  │   (Kafka)    │  │   (GraphQL)  │     │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘     │
+└─────────┼──────────────────┼──────────────────┼─────────────┘
+          │                  │                  │
+          └──────────────────┼──────────────────┘
+                             │
+          ┌──────────────────▼──────────────────┐
+          │      INPUT PORTS (Interfaces)       │
+          │  ┌──────────────────────────────┐   │
+          │  │  InsertCartInputPort         │   │
+          │  │  FindCartByIdInputPort       │   │
+          │  └──────────────────────────────┘   │
+          └──────────────────┬──────────────────┘
+                             │
+          ┌──────────────────▼──────────────────┐
+          │         CORE (Lógica de Negócio)    │
+          │  ┌──────────────────────────────┐   │
+          │  │  Domain (Cart, CartStatus)   │   │
+          │  │  Use Cases (InsertCart,      │   │
+          │  │              FindCart)       │   │
+          │  └──────────────────────────────┘   │
+          └──────────────────┬──────────────────┘
+                             │
+          ┌──────────────────▼──────────────────┐
+          │     OUTPUT PORTS (Interfaces)       │
+          │  ┌──────────────────────────────┐   │
+          │  │  InsertCartOutputPort       │   │
+          │  │  FindCartByIdOutputPort     │   │
+          │  └──────────────────────────────┘   │
+          └──────────────────┬──────────────────┘
+                             │
+          ┌──────────────────▼──────────────────┐
+          │                  ADAPTERS OUT       │
+          │  ┌──────────────┐  ┌──────────────┐│
+          │  │  Repository  │  │   Client     ││
+          │  │  (JPA)      │  │   (HTTP)     ││
+          │  └──────────────┘  └──────────────┘│
+          └─────────────────────────────────────┘
+```
+
+---
+
+## 🎯 Princípios Fundamentais
+
+### 1. **Dependência Inversa**
+- O **core** nunca depende de **adapters**
+- **Adapters** dependem do **core** através de **ports** (interfaces)
+- A direção da dependência sempre aponta para o core
+
+### 2. **Separação de Responsabilidades**
+- Cada camada tem uma responsabilidade única e bem definida
+- Domain contém apenas lógica de negócio pura
+- Use Cases orquestram a lógica de negócio
+- Adapters lidam com detalhes técnicos
+
+### 3. **Independência de Frameworks**
+- Domain não conhece Spring, JPA, ou qualquer framework
+- Use Cases podem usar Spring apenas para injeção de dependência (`@Service`)
+- Ports são interfaces Java puras
+
+### 4. **Testabilidade**
+- Core pode ser testado sem frameworks
+- Adapters podem ser mockados facilmente através de ports
+- Cada camada pode ser testada isoladamente
+
+---
+
+## 📁 Estrutura de Camadas
+
+```
+src/main/java/br/com/fsj/salesplatform/
+│
+├── application/                    # Camada de Aplicação (Core)
+│   ├── core/
+│   │   ├── domain/                # Entidades de Domínio
+│   │   │   ├── Cart.java
+│   │   │   ├── CartChannel.java
+│   │   │   └── CartStatus.java
+│   │   └── usecase/               # Casos de Uso (Lógica de Negócio)
+│   │       ├── InsertCartUseCase.java
+│   │       └── FindCartUseCase.java
+│   └── ports/
+│       ├── in/                    # Portas de Entrada (Interfaces)
+│       │   ├── InsertCartInputPort.java
+│       │   └── FindCartByIdInputPort.java
+│       └── out/                   # Portas de Saída (Interfaces)
+│           ├── InsertCartOutputPort.java
+│           └── FindCartByIdOutputPort.java
+│
+├── adapters/                      # Adaptadores (Implementações)
+│   ├── in/                       # Adaptadores de Entrada
+│   │   ├── controller/           # Controllers REST
+│   │   │   ├── CartController.java
+│   │   │   ├── mapper/
+│   │   │   │   └── CartMapper.java
+│   │   │   ├── request/
+│   │   │   │   └── CartRequest.java
+│   │   │   └── response/
+│   │   │       └── CartResponse.java
+│   │   └── consumer/             # Consumidores de Mensageria (ex: Kafka)
+│   │
+│   └── out/                      # Adaptadores de Saída
+│       ├── repository/           # Repositórios JPA
+│       │   ├── CartRepository.java
+│       │   ├── entity/
+│       │   │   └── CartEntity.java
+│       │   └── mapper/
+│       │       └── CartEntityMapper.java
+│       ├── InsertCartAdapter.java
+│       ├── FindCartByIdAdapter.java
+│       └── client/               # Clientes HTTP (APIs Externas)
+│
+└── config/                       # Configurações do Spring
+```
+
+---
+
+## 🔒 Regras de Dependências
+
+### Regras Obrigatórias
+
+1. **Domain não pode depender de nada**
+   - ❌ Não pode importar Spring, JPA, Jakarta, ou qualquer framework
+   - ❌ Não pode ter anotações de framework
+   - ✅ Apenas classes Java puras (records, enums, classes POJO)
+
+2. **Use Cases podem depender apenas de:**
+   - ✅ Domain
+   - ✅ Input Ports (implementar)
+   - ✅ Output Ports (usar)
+   - ✅ Spring (`@Service` para injeção de dependência)
+
+3. **Ports são interfaces puras**
+   - ✅ Apenas interfaces Java
+   - ✅ Sem dependências de frameworks
+   - ✅ Retornam objetos de Domain ou tipos primitivos
+
+4. **Adapters In podem depender de:**
+   - ✅ Input Ports (usar)
+   - ✅ Domain (para conversão)
+   - ✅ Spring (`@RestController`, `@Component`)
+   - ✅ DTOs (Request/Response)
+   - ✅ Mappers (MapStruct)
+   - ❌ **NUNCA** de Adapters Out
+
+5. **Adapters Out podem depender de:**
+   - ✅ Output Ports (implementar)
+   - ✅ Domain (para conversão)
+   - ✅ Spring (`@Component`)
+   - ✅ Entities JPA
+   - ✅ Repositories JPA
+   - ✅ Mappers (MapStruct)
+   - ❌ **NUNCA** de Adapters In
+
+6. **Adapters não podem depender uns dos outros**
+   - ❌ Adapters In não dependem de Adapters Out
+   - ❌ Adapters Out não dependem de Adapters In
+
+### Diagrama de Dependências
+
+```
+Adapters In → Input Ports → Use Cases → Output Ports → Adapters Out
+     ↓            ↓            ↓            ↓              ↓
+   Domain ←──── Domain ←──── Domain ←──── Domain ←────── Domain
+```
+
+---
+
+## 📝 Padrões de Nomenclatura
+
+### Padrões Obrigatórios
+
+| Tipo | Padrão | Exemplo | Localização |
+|------|--------|---------|-------------|
+| **Domain** | `[Entidade]` | `Cart`, `Product` | `application/core/domain/` |
+| **Use Case** | `[Ação][Entidade]UseCase` | `InsertCartUseCase` | `application/core/usecase/` |
+| **Input Port** | `[Ação][Entidade]InputPort` | `InsertCartInputPort` | `application/ports/in/` |
+| **Output Port** | `[Ação][Entidade]OutputPort` | `InsertCartOutputPort` | `application/ports/out/` |
+| **Adapter Out** | `[Ação][Entidade]Adapter` | `InsertCartAdapter` | `adapters/out/` |
+| **Controller** | `[Entidade]Controller` | `CartController` | `adapters/in/controller/` |
+| **Entity** | `[Entidade]Entity` | `CartEntity` | `adapters/out/repository/entity/` |
+| **Repository** | `[Entidade]Repository` | `CartRepository` | `adapters/out/repository/` |
+| **Request** | `[Entidade]Request` | `CartRequest` | `adapters/in/controller/request/` |
+| **Response** | `[Entidade]Response` | `CartResponse` | `adapters/in/controller/response/` |
+| **Mapper Controller** | `[Entidade]Mapper` | `CartMapper` | `adapters/in/controller/mapper/` |
+| **Mapper Entity** | `[Entidade]EntityMapper` | `CartEntityMapper` | `adapters/out/repository/mapper/` |
+
+### Ações Comuns
+
+- `Insert` - Criar/Inserir
+- `Update` - Atualizar
+- `Delete` - Deletar
+- `Find` - Buscar
+- `List` - Listar
+- `Validate` - Validar
+
+---
+
+## 🔄 Fluxo de Dados
+
+### Fluxo Completo: Criar um Carrinho
+
+```
+1. Cliente HTTP
+   ↓ POST /cart
+   ↓ { "customerCpf": "12345678900", "channel": "WEB" }
+   
+2. CartController (Adapter In)
+   ↓ Recebe CartRequest
+   ↓ Valida com @Valid
+   ↓ Converte: CartRequest → Cart (Domain) via CartMapper
+   ↓ Chama: insertCartInputPort.insert(cart)
+   
+3. InsertCartInputPort (Interface)
+   ↓ Contrato definido
+   
+4. InsertCartUseCase (Use Case)
+   ↓ Implementa InsertCartInputPort
+   ↓ Executa lógica de negócio (se houver)
+   ↓ Chama: insertCartOutputPort.insert(cart)
+   
+5. InsertCartOutputPort (Interface)
+   ↓ Contrato definido
+   
+6. InsertCartAdapter (Adapter Out)
+   ↓ Implementa InsertCartOutputPort
+   ↓ Converte: Cart (Domain) → CartEntity via CartEntityMapper
+   ↓ Persiste: cartRepository.save(entity)
+   ↓ Converte: CartEntity → Cart (Domain) via CartEntityMapper
+   ↓ Retorna: Cart (Domain)
+   
+7. InsertCartUseCase
+   ↓ Recebe Cart retornado
+   ↓ Retorna para o Controller
+   
+8. CartController
+   ↓ Converte: Cart → CartResponse via CartMapper
+   ↓ Retorna: ResponseEntity<CartResponse>
+   
+9. Cliente HTTP
+   ← Recebe: { "id": "uuid", "customerCpf": "12345678900" }
+```
+
+### Regras do Fluxo
+
+1. **Request → Domain**: Sempre converter Request para Domain antes de chamar Input Port
+2. **Domain → Entity**: Converter Domain para Entity apenas no Adapter Out
+3. **Entity → Domain**: Converter Entity para Domain antes de retornar do Adapter Out
+4. **Domain → Response**: Converter Domain para Response no Controller antes de retornar
+5. **Nunca passar DTOs ou Entities entre camadas**: Apenas Domain objetos
+
+---
+
+## 📋 Regras por Camada
+
+### 1. Domain (`application/core/domain/`)
+
+**Responsabilidade**: Representa as entidades de negócio puras.
+
+**Regras**:
+- ✅ Usar `record` ou classes POJO simples
+- ✅ Sem anotações de framework (`@Entity`, `@Service`, etc.)
+- ✅ Sem dependências externas (apenas Java padrão)
+- ✅ Pode conter enums relacionados ao domínio
+- ✅ Pode conter validações de regras de negócio básicas
+
+**Exemplo**:
+```java
+package br.com.fsj.salesplatform.application.core.domain;
+
+public record Cart(
+    String id,
+    String customerCpf,
+    CartChannel channel
+) {}
+```
+
+### 2. Use Cases (`application/core/usecase/`)
+
+**Responsabilidade**: Implementa a lógica de negócio específica.
+
+**Regras**:
+- ✅ Implementa uma interface `InputPort`
+- ✅ Anotado com `@Service`
+- ✅ Injeção de dependência via construtor
+- ✅ Depende apenas de `OutputPorts` (não de Adapters)
+- ✅ Contém regras de negócio
+- ✅ Pode lançar exceções de negócio
+
+**Exemplo**:
+```java
+package br.com.fsj.salesplatform.application.core.usecase;
+
+import br.com.fsj.salesplatform.application.core.domain.Cart;
+import br.com.fsj.salesplatform.application.ports.in.InsertCartInputPort;
+import br.com.fsj.salesplatform.application.ports.out.InsertCartOutputPort;
+import org.springframework.stereotype.Service;
+
+@Service
+public class InsertCartUseCase implements InsertCartInputPort {
+
+    private final InsertCartOutputPort outputPort;
+
+    public InsertCartUseCase(InsertCartOutputPort outputPort) {
+        this.outputPort = outputPort;
+    }
+
+    @Override
+    public Cart insert(Cart request) {
+        // Lógica de negócio aqui
+        return this.outputPort.insert(request);
+    }
+}
+```
+
+### 3. Input Ports (`application/ports/in/`)
+
+**Responsabilidade**: Define contratos de entrada para o core.
+
+**Regras**:
+- ✅ Sempre interfaces Java puras
+- ✅ Sem anotações
+- ✅ Métodos recebem e retornam objetos de Domain
+- ✅ Nome deve seguir padrão: `[Ação][Entidade]InputPort`
+
+**Exemplo**:
+```java
+package br.com.fsj.salesplatform.application.ports.in;
+
+import br.com.fsj.salesplatform.application.core.domain.Cart;
+
+public interface InsertCartInputPort {
+    Cart insert(Cart request);
+}
+```
+
+### 4. Output Ports (`application/ports/out/`)
+
+**Responsabilidade**: Define contratos de saída do core.
+
+**Regras**:
+- ✅ Sempre interfaces Java puras
+- ✅ Sem anotações
+- ✅ Métodos recebem e retornam objetos de Domain ou `Optional<Domain>`
+- ✅ Nome deve seguir padrão: `[Ação][Entidade]OutputPort`
+- ✅ Usar `Optional` quando o resultado pode não existir
+
+**Exemplo**:
+```java
+package br.com.fsj.salesplatform.application.ports.out;
+
+import br.com.fsj.salesplatform.application.core.domain.Cart;
+import java.util.Optional;
+
+public interface FindCartByIdOutputPort {
+    Optional<Cart> find(String id);
+}
+```
+
+### 5. Adapters In - Controllers (`adapters/in/controller/`)
+
+**Responsabilidade**: Implementa endpoints REST.
+
+**Regras**:
+- ✅ Anotado com `@RestController`
+- ✅ Usa apenas `InputPorts` (nunca `OutputPorts` ou `Adapters Out`)
+- ✅ Validação com `@Valid` nos métodos
+- ✅ Converte Request → Domain antes de chamar Input Port
+- ✅ Converte Domain → Response antes de retornar
+- ✅ Usa `CartMapper` para conversões
+- ✅ Documentação OpenAPI com `@Operation` e `@ApiResponses`
+
+**Exemplo**:
+```java
+package br.com.fsj.salesplatform.adapters.in.controller;
+
+import br.com.fsj.salesplatform.adapters.in.controller.mapper.CartMapper;
+import br.com.fsj.salesplatform.adapters.in.controller.request.CartRequest;
+import br.com.fsj.salesplatform.adapters.in.controller.response.CartResponse;
+import br.com.fsj.salesplatform.application.ports.in.InsertCartInputPort;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("cart")
+public class CartController {
+
+    private final InsertCartInputPort insertCartInputPort;
+    private final CartMapper mapper;
+
+    public CartController(InsertCartInputPort insertCartInputPort, CartMapper mapper) {
+        this.insertCartInputPort = insertCartInputPort;
+        this.mapper = mapper;
+    }
+
+    @PostMapping
+    public ResponseEntity<CartResponse> create(@Valid @RequestBody CartRequest request) {
+        var domain = mapper.toDomain(request);
+        var result = insertCartInputPort.insert(domain);
+        return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponse(result));
+    }
+}
+```
+
+### 6. Adapters Out (`adapters/out/`)
+
+**Responsabilidade**: Implementa persistência e integrações externas.
+
+**Regras**:
+- ✅ Anotado com `@Component`
+- ✅ Implementa uma interface `OutputPort`
+- ✅ Converte Domain → Entity antes de persistir
+- ✅ Converte Entity → Domain antes de retornar
+- ✅ Usa `CartEntityMapper` para conversões
+- ✅ Usa `Repository` para persistência
+
+**Exemplo**:
+```java
+package br.com.fsj.salesplatform.adapters.out;
+
+import br.com.fsj.salesplatform.adapters.out.repository.CartRepository;
+import br.com.fsj.salesplatform.adapters.out.repository.mapper.CartEntityMapper;
+import br.com.fsj.salesplatform.application.core.domain.Cart;
+import br.com.fsj.salesplatform.application.ports.out.InsertCartOutputPort;
+import org.springframework.stereotype.Component;
+
+@Component
+public class InsertCartAdapter implements InsertCartOutputPort {
+
+    private final CartRepository repository;
+    private final CartEntityMapper mapper;
+
+    public InsertCartAdapter(CartRepository repository, CartEntityMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    @Override
+    public Cart insert(Cart domain) {
+        var entity = mapper.toEntity(domain);
+        var saved = repository.save(entity);
+        return mapper.toDomain(saved);
+    }
+}
+```
+
+### 7. Entities (`adapters/out/repository/entity/`)
+
+**Responsabilidade**: Representa tabelas do banco de dados.
+
+**Regras**:
+- ✅ Anotado com `@Entity`
+- ✅ Estende `AuditableEntity` quando necessário
+- ✅ Usa anotações JPA (`@Table`, `@Column`, `@Id`, etc.)
+- ✅ Getters e Setters obrigatórios
+- ✅ Construtor padrão obrigatório
+- ✅ Nome deve seguir padrão: `[Entidade]Entity`
+
+**Exemplo**:
+```java
+package br.com.fsj.salesplatform.adapters.out.repository.entity;
+
+import jakarta.persistence.*;
+import java.util.UUID;
+
+@Entity
+@Table(name = "carts")
+public class CartEntity extends AuditableEntity {
+
+    @Id
+    @Column(name = "id", updatable = false, nullable = false)
+    private UUID id;
+
+    @Column(name = "customer_cpf", nullable = false, length = 11)
+    private String customerCpf;
+
+    // Getters e Setters...
+}
+```
+
+### 8. Repositories (`adapters/out/repository/`)
+
+**Responsabilidade**: Interface de acesso ao banco de dados.
+
+**Regras**:
+- ✅ Estende `JpaRepository<Entity, ID>`
+- ✅ Interface Java pura (sem implementação)
+- ✅ Nome deve seguir padrão: `[Entidade]Repository`
+
+**Exemplo**:
+```java
+package br.com.fsj.salesplatform.adapters.out.repository;
+
+import br.com.fsj.salesplatform.adapters.out.repository.entity.CartEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.UUID;
+
+public interface CartRepository extends JpaRepository<CartEntity, UUID> {
+}
+```
+
+### 9. Mappers
+
+**Responsabilidade**: Converte entre diferentes representações.
+
+**Regras**:
+- ✅ Usa MapStruct (`@Mapper(componentModel = "spring")`)
+- ✅ Interface Java (implementação gerada automaticamente)
+- ✅ Mapper Controller: `adapters/in/controller/mapper/`
+- ✅ Mapper Entity: `adapters/out/repository/mapper/`
+
+**Exemplo - Controller Mapper**:
+```java
+package br.com.fsj.salesplatform.adapters.in.controller.mapper;
+
+import br.com.fsj.salesplatform.adapters.in.controller.request.CartRequest;
+import br.com.fsj.salesplatform.adapters.in.controller.response.CartResponse;
+import br.com.fsj.salesplatform.application.core.domain.Cart;
+import org.mapstruct.Mapper;
+
+@Mapper(componentModel = "spring")
+public interface CartMapper {
+    Cart toDomain(CartRequest request);
+    CartResponse toResponse(Cart domain);
+}
+```
+
+**Exemplo - Entity Mapper**:
+```java
+package br.com.fsj.salesplatform.adapters.out.repository.mapper;
+
+import br.com.fsj.salesplatform.adapters.out.repository.entity.CartEntity;
+import br.com.fsj.salesplatform.application.core.domain.Cart;
+import org.mapstruct.Mapper;
+
+@Mapper(componentModel = "spring")
+public interface CartEntityMapper {
+    Cart toDomain(CartEntity entity);
+    CartEntity toEntity(Cart domain);
+}
+```
+
+### 10. DTOs (Request/Response)
+
+**Responsabilidade**: Representa dados de entrada e saída da API.
+
+**Regras**:
+- ✅ Request: `adapters/in/controller/request/`
+- ✅ Response: `adapters/in/controller/response/`
+- ✅ Usar `record` quando possível
+- ✅ Validações com Bean Validation no Request (`@NotBlank`, `@NotNull`, etc.)
+- ✅ Nome deve seguir padrão: `[Entidade]Request` / `[Entidade]Response`
+
+**Exemplo - Request**:
+```java
+package br.com.fsj.salesplatform.adapters.in.controller.request;
+
+import br.com.fsj.salesplatform.application.core.domain.CartChannel;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
+public record CartRequest(
+    String id,
+    @NotBlank(message = "CPF é obrigatório")
+    String customerCpf,
+    @NotNull(message = "Canal é obrigatório")
+    CartChannel channel
+) {}
+```
+
+**Exemplo - Response**:
+```java
+package br.com.fsj.salesplatform.adapters.in.controller.response;
+
+public record CartResponse(
+    String id,
+    String customerCpf
+) {}
+```
+
+---
+
+## 📚 Exemplo Completo de Implementação
+
+### Cenário: Implementar funcionalidade de Produto
+
+#### Passo 1: Criar Domain
+```java
+// application/core/domain/Product.java
+package br.com.fsj.salesplatform.application.core.domain;
+
+import java.math.BigDecimal;
+
+public record Product(
+    String id,
+    String name,
+    BigDecimal price
+) {}
+```
+
+#### Passo 2: Criar Input Port
+```java
+// application/ports/in/InsertProductInputPort.java
+package br.com.fsj.salesplatform.application.ports.in;
+
+import br.com.fsj.salesplatform.application.core.domain.Product;
+
+public interface InsertProductInputPort {
+    Product insert(Product product);
+}
+```
+
+#### Passo 3: Criar Output Port
+```java
+// application/ports/out/InsertProductOutputPort.java
+package br.com.fsj.salesplatform.application.ports.out;
+
+import br.com.fsj.salesplatform.application.core.domain.Product;
+
+public interface InsertProductOutputPort {
+    Product insert(Product product);
+}
+```
+
+#### Passo 4: Criar Use Case
+```java
+// application/core/usecase/InsertProductUseCase.java
+package br.com.fsj.salesplatform.application.core.usecase;
+
+import br.com.fsj.salesplatform.application.core.domain.Product;
+import br.com.fsj.salesplatform.application.ports.in.InsertProductInputPort;
+import br.com.fsj.salesplatform.application.ports.out.InsertProductOutputPort;
+import org.springframework.stereotype.Service;
+
+@Service
+public class InsertProductUseCase implements InsertProductInputPort {
+
+    private final InsertProductOutputPort outputPort;
+
+    public InsertProductUseCase(InsertProductOutputPort outputPort) {
+        this.outputPort = outputPort;
+    }
+
+    @Override
+    public Product insert(Product product) {
+        // Validações de negócio aqui
+        return this.outputPort.insert(product);
+    }
+}
+```
+
+#### Passo 5: Criar Entity
+```java
+// adapters/out/repository/entity/ProductEntity.java
+package br.com.fsj.salesplatform.adapters.out.repository.entity;
+
+import jakarta.persistence.*;
+import java.math.BigDecimal;
+import java.util.UUID;
+
+@Entity
+@Table(name = "products")
+public class ProductEntity extends AuditableEntity {
+
+    @Id
+    @Column(name = "id", updatable = false, nullable = false)
+    private UUID id;
+
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    @Column(name = "price", nullable = false)
+    private BigDecimal price;
+
+    // Getters e Setters...
+}
+```
+
+#### Passo 6: Criar Repository
+```java
+// adapters/out/repository/ProductRepository.java
+package br.com.fsj.salesplatform.adapters.out.repository;
+
+import br.com.fsj.salesplatform.adapters.out.repository.entity.ProductEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.UUID;
+
+public interface ProductRepository extends JpaRepository<ProductEntity, UUID> {
+}
+```
+
+#### Passo 7: Criar Entity Mapper
+```java
+// adapters/out/repository/mapper/ProductEntityMapper.java
+package br.com.fsj.salesplatform.adapters.out.repository.mapper;
+
+import br.com.fsj.salesplatform.adapters.out.repository.entity.ProductEntity;
+import br.com.fsj.salesplatform.application.core.domain.Product;
+import org.mapstruct.Mapper;
+
+@Mapper(componentModel = "spring")
+public interface ProductEntityMapper {
+    Product toDomain(ProductEntity entity);
+    ProductEntity toEntity(Product domain);
+}
+```
+
+#### Passo 8: Criar Adapter Out
+```java
+// adapters/out/InsertProductAdapter.java
+package br.com.fsj.salesplatform.adapters.out;
+
+import br.com.fsj.salesplatform.adapters.out.repository.ProductRepository;
+import br.com.fsj.salesplatform.adapters.out.repository.mapper.ProductEntityMapper;
+import br.com.fsj.salesplatform.application.core.domain.Product;
+import br.com.fsj.salesplatform.application.ports.out.InsertProductOutputPort;
+import org.springframework.stereotype.Component;
+
+@Component
+public class InsertProductAdapter implements InsertProductOutputPort {
+
+    private final ProductRepository repository;
+    private final ProductEntityMapper mapper;
+
+    public InsertProductAdapter(ProductRepository repository, ProductEntityMapper mapper) {
+        this.repository = repository;
+        this.mapper = mapper;
+    }
+
+    @Override
+    public Product insert(Product domain) {
+        var entity = mapper.toEntity(domain);
+        var saved = repository.save(entity);
+        return mapper.toDomain(saved);
+    }
+}
+```
+
+#### Passo 9: Criar DTOs
+```java
+// adapters/in/controller/request/ProductRequest.java
+package br.com.fsj.salesplatform.adapters.in.controller.request;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
+import java.math.BigDecimal;
+
+public record ProductRequest(
+    @NotBlank(message = "Nome é obrigatório")
+    String name,
+    
+    @NotNull(message = "Preço é obrigatório")
+    @Positive(message = "Preço deve ser maior que zero")
+    BigDecimal price
+) {}
+```
+
+```java
+// adapters/in/controller/response/ProductResponse.java
+package br.com.fsj.salesplatform.adapters.in.controller.response;
+
+import java.math.BigDecimal;
+
+public record ProductResponse(
+    String id,
+    String name,
+    BigDecimal price
+) {}
+```
+
+#### Passo 10: Criar Controller Mapper
+```java
+// adapters/in/controller/mapper/ProductMapper.java
+package br.com.fsj.salesplatform.adapters.in.controller.mapper;
+
+import br.com.fsj.salesplatform.adapters.in.controller.request.ProductRequest;
+import br.com.fsj.salesplatform.adapters.in.controller.response.ProductResponse;
+import br.com.fsj.salesplatform.application.core.domain.Product;
+import org.mapstruct.Mapper;
+
+@Mapper(componentModel = "spring")
+public interface ProductMapper {
+    Product toDomain(ProductRequest request);
+    ProductResponse toResponse(Product domain);
+}
+```
+
+#### Passo 11: Criar Controller
+```java
+// adapters/in/controller/ProductController.java
+package br.com.fsj.salesplatform.adapters.in.controller;
+
+import br.com.fsj.salesplatform.adapters.in.controller.mapper.ProductMapper;
+import br.com.fsj.salesplatform.adapters.in.controller.request.ProductRequest;
+import br.com.fsj.salesplatform.adapters.in.controller.response.ProductResponse;
+import br.com.fsj.salesplatform.application.ports.in.InsertProductInputPort;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/products")
+public class ProductController {
+
+    private final InsertProductInputPort insertProductInputPort;
+    private final ProductMapper mapper;
+
+    public ProductController(InsertProductInputPort insertProductInputPort, ProductMapper mapper) {
+        this.insertProductInputPort = insertProductInputPort;
+        this.mapper = mapper;
+    }
+
+    @PostMapping
+    public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
+        var domain = mapper.toDomain(request);
+        var result = insertProductInputPort.insert(domain);
+        return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponse(result));
+    }
+}
+```
+
+---
+
+## ✅ Checklist de Implementação
+
+Ao implementar uma nova funcionalidade, seguir esta ordem:
+
+### Fase 1: Core (Domain e Ports)
+- [ ] Criar Domain (`application/core/domain/[Entidade].java`)
+- [ ] Criar Input Port (`application/ports/in/[Ação][Entidade]InputPort.java`)
+- [ ] Criar Output Port (`application/ports/out/[Ação][Entidade]OutputPort.java`)
+- [ ] Criar Use Case (`application/core/usecase/[Ação][Entidade]UseCase.java`)
+
+### Fase 2: Persistência (Adapters Out)
+- [ ] Criar Entity (`adapters/out/repository/entity/[Entidade]Entity.java`)
+- [ ] Criar Repository (`adapters/out/repository/[Entidade]Repository.java`)
+- [ ] Criar Entity Mapper (`adapters/out/repository/mapper/[Entidade]EntityMapper.java`)
+- [ ] Criar Adapter Out (`adapters/out/[Ação][Entidade]Adapter.java`)
+
+### Fase 3: API (Adapters In)
+- [ ] Criar Request (`adapters/in/controller/request/[Entidade]Request.java`)
+- [ ] Criar Response (`adapters/in/controller/response/[Entidade]Response.java`)
+- [ ] Criar Controller Mapper (`adapters/in/controller/mapper/[Entidade]Mapper.java`)
+- [ ] Criar Controller (`adapters/in/controller/[Entidade]Controller.java`)
+
+### Fase 4: Validação
+- [ ] Executar testes arquiteturais (`LayeredArchitectureTest`)
+- [ ] Compilar projeto (`./gradlew clean build`)
+- [ ] Verificar se MapStruct gerou implementações dos mappers
+- [ ] Testar endpoints manualmente ou com testes de integração
+
+---
+
+## 🔍 Validações Arquiteturais
+
+O projeto possui testes arquiteturais que validam automaticamente as regras. Execute:
+
+```bash
+./gradlew test --tests LayeredArchitectureTest
+```
+
+### Regras Validadas
+
+1. ✅ Arquitetura em camadas respeitada
+2. ✅ Adapters In não dependem de Adapters Out
+3. ✅ Adapters Out não dependem de Adapters In
+4. ✅ Core não depende de Adapters
+5. ✅ Domain não tem anotações de framework
+6. ✅ Use Cases estão anotados com `@Service`
+7. ✅ Adapters Out estão anotados com `@Component`
+8. ✅ Controllers estão anotados com `@RestController`
+9. ✅ Controllers usam apenas Input Ports
+10. ✅ Ports são interfaces
+11. ✅ Nomenclatura correta em todas as camadas
+12. ✅ Sem ciclos de dependência
+
+---
+
+## ⚠️ Tratamento de Exceções
+
+A aplicação utiliza o padrão **RFC 9457 (Problem Details for HTTP APIs)** para respostas de erro.
+
+### 1. Tipos de Exceções
+- **`BusinessException`**: Erros de lógica de negócio (ex: estoque insuficiente, regra violada). Retorna status `409 Conflict`.
+- **`ResourceNotFoundException`**: Recurso solicitado não existe. Retorna status `404 Not Found`.
+- **`IllegalArgumentException`**: Dados de entrada inválidos. Retorna status `400 Bad Request`.
+- **`IllegalStateException`**: Conflito de estado. Retorna status `409 Conflict`.
+
+### 2. Onde Lançar
+- **Use Cases**: Devem lançar `BusinessException` para falhas em regras de negócio e `ResourceNotFoundException` quando o domínio não é encontrado por um `Output Port`.
+- **Adapters In**: Validações de entrada via `Bean Validation` (@Valid) são tratadas automaticamente pelo `ApiExceptionHandler`.
+- **Adapters Out**: Podem lançar exceções específicas de infraestrutura se necessário, mas idealmente devem ser convertidas em exceções de domínio/negócio.
+
+### 3. Padrão de Resposta (JSON)
+```json
+{
+  "type": "https://api.fsj.com.br/problems/business-rule-violation",
+  "title": "Business Rule Violation",
+  "status": 409,
+  "detail": "Mensagem detalhada do erro",
+  "instance": "/api/v1/resource",
+  "timestamp": "2025-01-07T12:00:00Z"
+}
+```
+
+---
+
+## 🚫 Erros Comuns e Como Evitar
+
+### ❌ Erro 1: Domain com anotações JPA
+```java
+// ERRADO
+@Entity
+public record Cart(...) {}
+```
+
+```java
+// CORRETO
+public record Cart(...) {}
+```
+
+### ❌ Erro 2: Controller usando Adapter Out diretamente
+```java
+// ERRADO
+@RestController
+public class CartController {
+    private final InsertCartAdapter adapter; // ❌
+}
+```
+
+```java
+// CORRETO
+@RestController
+public class CartController {
+    private final InsertCartInputPort inputPort; // ✅
+}
+```
+
+### ❌ Erro 3: Use Case usando Entity
+```java
+// ERRADO
+@Service
+public class InsertCartUseCase {
+    public Cart insert(CartEntity entity) { // ❌
+    }
+}
+```
+
+```java
+// CORRETO
+@Service
+public class InsertCartUseCase {
+    public Cart insert(Cart domain) { // ✅
+    }
+}
+```
+
+### ❌ Erro 4: Passar DTO entre camadas
+```java
+// ERRADO
+public Cart insert(CartRequest request) { // ❌
+}
+```
+
+```java
+// CORRETO
+public Cart insert(Cart domain) { // ✅
+}
+```
+
+### ❌ Erro 5: Adapter In dependendo de Adapter Out
+```java
+// ERRADO
+@RestController
+public class CartController {
+    private final InsertCartAdapter adapter; // ❌
+}
+```
+
+```java
+// CORRETO
+@RestController
+public class CartController {
+    private final InsertCartInputPort inputPort; // ✅
+}
+```
+
+---
+
+## 📖 Resumo das Regras Críticas
+
+1. **Domain é puro**: Sem frameworks, sem anotações, apenas Java
+2. **Use Cases orquestram**: Implementam Input Ports, usam Output Ports
+3. **Ports são interfaces**: Sem implementação, sem frameworks
+4. **Adapters In**: Usam Input Ports, nunca Output Ports ou Adapters Out
+5. **Adapters Out**: Implementam Output Ports, nunca conhecem Adapters In
+6. **Conversões**: Request→Domain→Entity→Domain→Response (sempre via mappers)
+7. **Nomenclatura**: Seguir padrões rigorosamente
+8. **Dependências**: Sempre apontar para o core, nunca entre adapters
+
+---
+
+## 🎓 Orientações para IA
+
+Ao implementar ou modificar código neste projeto:
+
+1. **Sempre seguir a ordem do checklist** acima
+2. **Nunca pular camadas** - todas são obrigatórias
+3. **Sempre usar mappers** para conversões entre camadas
+4. **Validar nomenclatura** antes de criar arquivos
+5. **Verificar dependências** - se não está na lista permitida, não usar
+6. **Domain primeiro** - sempre começar pelo Domain
+7. **Ports antes de implementações** - definir contratos antes de implementar
+8. **Testar arquitetura** após implementação
