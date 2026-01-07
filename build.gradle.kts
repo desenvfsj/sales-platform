@@ -10,7 +10,7 @@ description = "Plataforma de Vendas Unificada"
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(25)
+        languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
@@ -58,6 +58,6 @@ tasks.named<Test>("test") {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.release = 25
+    options.release = 21
 }
 

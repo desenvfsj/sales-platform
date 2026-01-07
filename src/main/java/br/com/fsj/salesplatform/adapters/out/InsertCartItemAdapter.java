@@ -1,0 +1,34 @@
+package br.com.fsj.salesplatform.adapters.out;
+
+import br.com.fsj.salesplatform.adapters.out.repository.CartItemRepository;
+import br.com.fsj.salesplatform.adapters.out.repository.entity.CartItemEntity;
+import br.com.fsj.salesplatform.adapters.out.repository.mapper.CartItemEntityMapper;
+import br.com.fsj.salesplatform.application.core.domain.CartItem;
+import br.com.fsj.salesplatform.application.ports.out.InsertCartItemOutputPort;
+import org.springframework.stereotype.Component;
+
+/**
+ * Adapter para inserir item no carrinho.
+ * 
+ * @author Sales Platform Team
+ * @since 1.0.0
+ */
+@Component
+public class InsertCartItemAdapter implements InsertCartItemOutputPort {
+    
+    private final CartItemRepository cartItemRepository;
+    private final CartItemEntityMapper cartItemEntityMapper;
+    
+    public InsertCartItemAdapter(CartItemRepository cartItemRepository,
+                                  CartItemEntityMapper cartItemEntityMapper) {
+        this.cartItemRepository = cartItemRepository;
+        this.cartItemEntityMapper = cartItemEntityMapper;
+    }
+    
+    @Override
+    public CartItem insert(CartItem item) {
+        CartItemEntity entity = cartItemEntityMapper.toEntity(item);
+        CartItemEntity saved = cartItemRepository.save(entity);
+        return cartItemEntityMapper.toDomain(saved);
+    }
+}
